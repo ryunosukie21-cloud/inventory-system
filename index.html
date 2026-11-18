@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DENR ICT Asset & Personnel Inventory System (Supabase Edition)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        denr: {
+                            900: '#081c15',
+                            800: '#1b4332',
+                            700: '#2d6a4f',
+                            600: '#40916c',
+                            500: '#52b788',
+                            400: '#74c69d',
+                            300: '#95d5b2',
+                            200: '#b7e4c7',
+                            100: '#d8f3dc',
+                            50: '#f0f7f4'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f7f4;
+        }
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background-color: #ffffff !important; color: #000000 !important; }
+            .page-break { page-break-before: always; }
+        }
+        .print-only { display: none; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col text-slate-800 relative">
+
+    <!-- ========================================== -->
+    <!-- AUTHENTICATION OVERLAY -->
+    <!-- ========================================== -->
+    <div id="authOverlay" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4 z-50 no-print">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden transition-all duration-300">
+            <div class="bg-denr-800 p-6 text-white text-center relative border-b-4 border-denr-500">
+                <div class="w-16 h-16 rounded-full bg-white text-denr-800 flex items-center justify-center font-bold text-3xl mx-auto mb-2 shadow border-2 border-denr-300">
+                    🌲
+                </div>
+                <p class="text-[11px] tracking-widest uppercase text-denr-300 font-bold">Republic of the Philippines</p>
+                <h1 class="text-lg font-bold tracking-tight leading-tight">DEPARTMENT OF ENVIRONMENT AND NATURAL RESOURCES</h1>
+                <p class="text-xs text-denr-200 font-medium mt-1">ICT Asset Management & Personnel Custody Portal</p>
+            </div>
+
+            <div class="p-6 sm:p-8">
+                <div id="authAlert" class="hidden mb-4 p-3 rounded-lg text-xs font-semibold flex items-center gap-2"></div>
+
+                <!-- LOGIN FORM -->
+                <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+                    <div class="border-b border-slate-200 pb-3 mb-4">
+                        <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-right-to-bracket text-denr-700"></i> Account Sign In
+                        </h2>
+                        <p class="text-xs text-slate-500">Enter your DENR email or mobile phone number to continue.</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Email Address or Mobile Phone Number</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-user absolute left-3 top-3 text-slate-400 text-sm"></i>
+                            <input type="text" id="loginId" required placeholder="juan@denr.gov.ph or 09171234567" class="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-denr-500 focus:outline-none">
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="block text-xs font-semibold text-slate-700">Password</label>
+                            <a href="#" onclick="showAuthView('forgot')" class="text-xs text-denr-700 hover:text-denr-900 font-semibold">Forgot Password?</a>
+                        </div>
+                        <div class="relative">
+                            <i class="fa-solid fa-lock absolute left-3 top-3 text-slate-400 text-sm"></i>
+                            <input type="password" id="loginPassword" required placeholder="••••••••" class="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-denr-500 focus:outline-none">
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full bg-denr-800 hover:bg-denr-900 text-white font-bold py-2.5 rounded-lg text-sm transition shadow-md flex items-center justify-center gap-2 mt-2">
+                        <i class="fa-solid fa-key"></i> Log In to Portal
+                    </button>
+                    <div class="text-center pt-3 border-t border-slate-100 text-xs text-slate-600">
+                        Don't have an authorized account? 
+                        <a href="#" onclick="showAuthView('register')" class="text-denr-700 font-bold hover:underline">Register New Personnel Account</a>
+                    </div>
+                </form>
+
+                <!-- REGISTER FORM -->
+                <form id="registerForm" onsubmit="handleRegister(event)" class="space-y-3 hidden">
+                    <div class="border-b border-slate-200 pb-2 mb-3">
+                        <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-user-plus text-denr-700"></i> Create Personnel Account
+                        </h2>
+                        <p class="text-xs text-slate-500">Fill in your official DENR details for inventory custody access.</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Full Name *</label>
+                        <input type="text" id="regName" required placeholder="Engr. Juan Dela Cruz" class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-denr-500 focus:outline-none">
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Email Address *</label>
+                            <input type="email" id="regEmail" required placeholder="juan@denr.gov.ph" class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-denr-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Mobile Phone Number *</label>
+                            <input type="tel" id="regPhone" required placeholder="09171234567" class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-denr-500 focus:outline-none">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Designation / Position *</label>
+                            <input type="text" id="regDesignation" required placeholder="IT Officer I" class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-denr-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">DENR Section *</label>
+                            <select id="regSection" required class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-denr-500 focus:outline-none section-dropdown-target"></select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Password *</label>
+                        <input type="password" id="regPassword" required placeholder="Minimum 6 characters" minlength="6" class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-denr-500 focus:outline-none">
+                    </div>
+                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-sm transition shadow flex items-center justify-center gap-2 mt-2">
+                        <i class="fa-solid fa-check"></i> Register Account & Sign In
+                    </button>
+                    <div class="text-center pt-2 text-xs text-slate-600">
+                        Already registered? <a href="#" onclick="showAuthView('login')" class="text-denr-700 font-bold hover:underline">Back to Login</a>
+                    </div>
+                </form>
+
+                <!-- FORGOT PASSWORD FORM -->
+                <form id="forgotForm" onsubmit="handleForgotPassword(event)" class="space-y-4 hidden">
+                    <div class="border-b border-slate-200 pb-3 mb-4">
+                        <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-shield-halved text-denr-700"></i> Account Recovery
+                        </h2>
+                        <p class="text-xs text-slate-500">Reset your security credentials using your registered email or mobile number.</p>
+                    </div>
+                    <div id="forgotStep1" class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Recovery Target (Email or Mobile Phone)</label>
+                            <input type="text" id="forgotInput" required placeholder="juan@denr.gov.ph or 09171234567" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-denr-500 focus:outline-none">
+                        </div>
+                        <button type="button" onclick="sendRecoveryCode()" class="w-full bg-denr-700 hover:bg-denr-800 text-white font-medium py-2 rounded-lg text-sm transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-paper-plane"></i> Send Verification Code
+                        </button>
+                    </div>
+                    <div id="forgotStep2" class="space-y-3 hidden">
+                        <div class="bg-denr-50 border border-denr-200 p-3 rounded-lg text-xs text-denr-900">
+                            <i class="fa-solid fa-circle-info text-denr-700"></i> Verification code sent! Use simulated code <strong class="text-denr-800">123456</strong> for testing.
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">6-Digit Verification Code</label>
+                            <input type="text" id="forgotCode" placeholder="123456" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono tracking-widest text-center focus:ring-2 focus:ring-denr-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">New Password</label>
+                            <input type="password" id="forgotNewPassword" placeholder="••••••••" minlength="6" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-denr-500 focus:outline-none">
+                        </div>
+                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-sm transition shadow">
+                            Update Password & Log In
+                        </button>
+                    </div>
+                    <div class="text-center pt-2 text-xs text-slate-600">
+                        Remembered your password? <a href="#" onclick="showAuthView('login')" class="text-denr-700 font-bold hover:underline">Return to Sign In</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MAIN INVENTORY APPLICATION -->
+    <!-- ========================================== -->
+    <header class="bg-denr-800 text-white shadow-lg no-print border-b-4 border-denr-500">
+        <div class="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-4 text-center md:text-left">
+                <div class="w-14 h-14 rounded-full bg-white text-denr-800 flex items-center justify-center font-bold text-2xl shadow border-2 border-denr-300 flex-shrink-0">
+                    🌲
+                </div>
+                <div>
+                    <p class="text-xs tracking-wider uppercase text-denr-300 font-semibold">Republic of the Philippines</p>
+                    <h1 class="text-lg sm:text-xl font-bold tracking-tight text-white leading-tight">DEPARTMENT OF ENVIRONMENT AND NATURAL RESOURCES</h1>
+                    <p class="text-xs text-denr-200 font-medium">ICT Equipment Inventory System </p>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-center md:justify-end gap-3 w-full md:w-auto">
+                <div id="userHeaderBadge" class="hidden flex items-center gap-3 bg-denr-900/90 border border-denr-600/70 px-3.5 py-1.5 rounded-xl shadow-inner">
+                    <div class="relative flex-shrink-0">
+                        <div class="w-9 h-9 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/50 flex items-center justify-center text-base shadow-sm">
+                            <i class="fa-solid fa-user-gear"></i>
+                        </div>
+                        <span class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-400 border-2 border-denr-900 rounded-full"></span>
+                    </div>
+                    <div class="text-left">
+                        <div class="flex items-center gap-1.5">
+                            <span id="headerUserName" class="font-bold text-white text-xs sm:text-sm tracking-tight leading-none">--</span>
+                            <span class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9px] px-1.5 py-0.5 rounded-md font-semibold uppercase">Active</span>
+                        </div>
+                        <p id="headerUserDesignation" class="text-[10px] text-denr-300 font-medium truncate max-w-[170px] mt-0.5">--</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button onclick="exportToCSV()" class="bg-denr-700 hover:bg-denr-600 text-white px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition flex items-center gap-2 border border-denr-500 shadow-sm">
+                        <i class="fa-solid fa-file-excel text-emerald-300"></i> Export CSV
+                    </button>
+                    <button onclick="printMasterList()" class="bg-denr-600 hover:bg-denr-500 text-white px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition flex items-center gap-2 border border-denr-400 shadow-sm">
+                        <i class="fa-solid fa-print"></i> Print Master
+                    </button>
+                    <button onclick="handleLogout()" title="Sign Out" class="bg-rose-700 hover:bg-rose-800 text-white px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition flex items-center gap-2 shadow-sm">
+                        <i class="fa-solid fa-right-from-bracket"></i> Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-1 sm:space-x-4 mt-2 overflow-x-auto text-xs sm:text-sm font-medium border-t border-denr-700/60 pt-2">
+            <button id="tab-personnel" onclick="switchTab('personnel')" class="px-4 py-2 rounded-t-lg bg-denr-50 text-denr-900 font-bold transition flex items-center gap-2">
+                <i class="fa-solid fa-users"></i> Personnel Directory
+            </button>
+            <button id="tab-assets" onclick="switchTab('assets')" class="px-4 py-2 rounded-t-lg text-denr-200 hover:text-white hover:bg-denr-700 transition flex items-center gap-2">
+                <i class="fa-solid fa-boxes-stacked"></i> All ICT Assets
+            </button>
+            <button id="tab-sections" onclick="switchTab('sections')" class="px-4 py-2 rounded-t-lg text-denr-200 hover:text-white hover:bg-denr-700 transition flex items-center gap-2">
+                <i class="fa-solid fa-building-user"></i> Sections View
+            </button>
+            <button id="tab-dashboard" onclick="switchTab('dashboard')" class="px-4 py-2 rounded-t-lg text-denr-200 hover:text-white hover:bg-denr-700 transition flex items-center gap-2">
+                <i class="fa-solid fa-chart-pie"></i> Summary Dashboard
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 no-print">
+        <div id="globalSearchBar" class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div class="flex flex-wrap gap-2 w-full md:w-auto">
+                <button onclick="openPersonnelModal()" class="bg-denr-700 hover:bg-denr-800 text-white font-medium px-4 py-2 rounded-lg text-sm transition flex items-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-user-plus"></i> Add Personnel
+                </button>
+                <button onclick="openAssetModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition flex items-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-plus-circle"></i> Register ICT Asset
+                </button>
+                <button onclick="openAddSectionModal()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition flex items-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-building-circle-plus"></i> Add Section
+                </button>
+            </div>
+
+            <div class="flex flex-col sm:flex-row w-full md:w-auto gap-3 items-center">
+                <div class="w-full sm:w-64">
+                    <select id="filterSectionSelect" onchange="applyFilters()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-denr-500 focus:outline-none bg-slate-50 section-dropdown-target"></select>
+                </div>
+                <div class="relative w-full sm:w-72">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-sm"></i>
+                    <input type="text" id="searchInput" onkeyup="applyFilters()" placeholder="Search Personnel, Asset, Serial..." class="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-denr-500 focus:outline-none">
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 1: PERSONNEL DIRECTORY -->
+        <div id="view-personnel" class="view-panel">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-xl font-bold text-denr-900 flex items-center gap-2">
+                        <i class="fa-solid fa-id-card text-denr-700"></i> DENR Personnel Directory
+                    </h2>
+                    <p class="text-xs text-slate-500">Click any personnel name to view all ICT items assigned & generate Property Acknowledgment Receipts (PAR).</p>
+                </div>
+                <span id="personnelCountBadge" class="bg-denr-100 text-denr-800 text-xs font-bold px-3 py-1 rounded-full">0 Personnel</span>
+            </div>
+            <div id="personnelCardsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        </div>
+
+        <!-- VIEW 2: PERSONNEL DETAIL -->
+        <div id="view-personnel-detail" class="view-panel hidden">
+            <button onclick="switchTab('personnel')" class="mb-4 text-denr-700 hover:text-denr-900 text-sm font-semibold flex items-center gap-2">
+                <i class="fa-solid fa-arrow-left"></i> Back to Personnel Directory
+            </button>
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+                <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+                    <div class="flex items-center gap-4">
+                        <div class="w-16 h-16 rounded-full bg-denr-100 text-denr-800 flex items-center justify-center font-bold text-2xl border-2 border-denr-300">
+                            <i class="fa-solid fa-user-gear"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h2 id="pDetailName" class="text-2xl font-bold text-slate-800">--</h2>
+                                <button onclick="editPersonnelFromDetail()" class="text-xs text-blue-600 hover:underline"><i class="fa-solid fa-pen-to-square"></i> Edit</button>
+                            </div>
+                            <p id="pDetailDesignation" class="text-sm font-medium text-slate-600">--</p>
+                            <span id="pDetailSection" class="inline-block mt-1 bg-denr-100 text-denr-800 text-xs font-bold px-2.5 py-0.5 rounded-full">--</span>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                        <button onclick="openAssignAssetModalForCurrentPersonnel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-3.5 py-2 rounded-lg transition flex items-center gap-2 shadow-sm">
+                            <i class="fa-solid fa-plus"></i> Assign New Equipment
+                        </button>
+                        <button onclick="printPARForCurrentPersonnel()" class="bg-denr-800 hover:bg-denr-900 text-white text-sm font-medium px-3.5 py-2 rounded-lg transition flex items-center gap-2 shadow-sm">
+                            <i class="fa-solid fa-file-invoice"></i> Print PAR Receipt
+                        </button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4 text-center">
+                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                        <p class="text-xs text-slate-500 font-semibold uppercase">Total Issued Items</p>
+                        <p id="pDetailTotalItems" class="text-xl font-bold text-denr-800">0</p>
+                    </div>
+                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                        <p class="text-xs text-slate-500 font-semibold uppercase">Active Computers</p>
+                        <p id="pDetailPCItems" class="text-xl font-bold text-blue-600">0</p>
+                    </div>
+                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                        <p class="text-xs text-slate-500 font-semibold uppercase">Printers & Scanners</p>
+                        <p id="pDetailPrinterItems" class="text-xl font-bold text-purple-600">0</p>
+                    </div>
+                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                        <p class="text-xs text-slate-500 font-semibold uppercase">Network & Misc</p>
+                        <p id="pDetailOtherItems" class="text-xl font-bold text-emerald-600">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                    <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-laptop-code text-denr-700"></i> Assigned ICT Equipment & Devices
+                    </h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-600 border-b border-slate-200 font-semibold uppercase text-xs">
+                                <th class="p-3">Asset Tag / Item ID</th>
+                                <th class="p-3">Category</th>
+                                <th class="p-3">Brand & Model Name</th>
+                                <th class="p-3">Serial Number</th>
+                                <th class="p-3">Specifications</th>
+                                <th class="p-3">Date Issued</th>
+                                <th class="p-3">Condition</th>
+                                <th class="p-3 text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="personnelItemsTableBody" class="divide-y divide-slate-200"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 3: ALL ICT ASSETS MASTER TABLE -->
+        <div id="view-assets" class="view-panel hidden">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-xl font-bold text-denr-900 flex items-center gap-2">
+                        <i class="fa-solid fa-boxes-stacked text-denr-700"></i> Master ICT Asset Inventory
+                    </h2>
+                    <p class="text-xs text-slate-500">Complete list of desktops, laptops, CCTV, printers, switches, NAS, and peripherals.</p>
+                </div>
+                <span id="masterAssetsCountBadge" class="bg-denr-100 text-denr-800 text-xs font-bold px-3 py-1 rounded-full">0 Assets</span>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-600 border-b border-slate-200 font-semibold uppercase text-xs">
+                                <th class="p-3">Asset Tag</th>
+                                <th class="p-3">Item / Category</th>
+                                <th class="p-3">Brand / Model</th>
+                                <th class="p-3">Serial Number</th>
+                                <th class="p-3">Section</th>
+                                <th class="p-3">Assigned Personnel</th>
+                                <th class="p-3">Status</th>
+                                <th class="p-3 text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="masterAssetTableBody" class="divide-y divide-slate-200"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 4: SECTIONS BREAKDOWN -->
+        <div id="view-sections" class="view-panel hidden">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+                <div>
+                    <h2 class="text-xl font-bold text-denr-900 flex items-center gap-2">
+                        <i class="fa-solid fa-sitemap text-denr-700"></i> ICT Assets per DENR Section
+                    </h2>
+                    <p class="text-xs text-slate-500">Breakdown of personnel and allocated devices per division or office section.</p>
+                </div>
+                <button onclick="openAddSectionModal()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3.5 py-2 rounded-lg transition shadow flex items-center gap-2">
+                    <i class="fa-solid fa-plus"></i> Add New Section
+                </button>
+            </div>
+            <div id="sectionsContainer" class="space-y-6"></div>
+        </div>
+
+        <!-- VIEW 5: SUMMARY DASHBOARD -->
+        <div id="view-dashboard" class="view-panel hidden">
+            <div class="mb-4">
+                <h2 class="text-xl font-bold text-denr-900 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-pie text-denr-700"></i> ICT Inventory Overview Dashboard
+                </h2>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-bold uppercase text-slate-400">Total Registered Assets</p>
+                        <h3 id="dashTotalAssets" class="text-3xl font-extrabold text-denr-800 mt-1">0</h3>
+                    </div>
+                    <div class="w-12 h-12 bg-denr-100 text-denr-700 rounded-lg flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-laptop"></i>
+                    </div>
+                </div>
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-bold uppercase text-slate-400">Active Personnel</p>
+                        <h3 id="dashTotalPersonnel" class="text-3xl font-extrabold text-blue-600 mt-1">0</h3>
+                    </div>
+                    <div class="w-12 h-12 bg-blue-100 text-blue-700 rounded-lg flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-user-check"></i>
+                    </div>
+                </div>
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-bold uppercase text-slate-400">Issued / In Use</p>
+                        <h3 id="dashIssuedAssets" class="text-3xl font-extrabold text-emerald-600 mt-1">0</h3>
+                    </div>
+                    <div class="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-lg flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-check-double"></i>
+                    </div>
+                </div>
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-bold uppercase text-slate-400">Maintenance / Repair</p>
+                        <h3 id="dashMaintenanceAssets" class="text-3xl font-extrabold text-amber-600 mt-1">0</h3>
+                    </div>
+                    <div class="w-12 h-12 bg-amber-100 text-amber-700 rounded-lg flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-wrench"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                <h3 class="font-bold text-slate-800 mb-4 border-b pb-2">Equipment Category Distribution</h3>
+                <div id="categoryStatsList" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- MODALS -->
+    <!-- MODAL 1: PERSONNEL -->
+    <div id="personnelModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden no-print">
+        <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden">
+            <div class="bg-denr-800 text-white p-4 flex items-center justify-between">
+                <h3 id="personnelModalTitle" class="font-bold text-base flex items-center gap-2">
+                    <i class="fa-solid fa-user-plus text-denr-300"></i> Add DENR Personnel
+                </h3>
+                <button onclick="closePersonnelModal()" class="text-denr-200 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="personnelForm" onsubmit="handlePersonnelSubmit(event)" class="p-6 space-y-4">
+                <input type="hidden" id="pFormId">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Full Name *</label>
+                    <input type="text" id="pFormName" required placeholder="Juan Dela Cruz" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-denr-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Designation / Position *</label>
+                    <input type="text" id="pFormDesignation" required placeholder="IT Officer I" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-denr-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Assigned DENR Section / Office *</label>
+                    <select id="pFormSection" required class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-denr-500 focus:outline-none section-dropdown-target"></select>
+                </div>
+                <div class="flex justify-end gap-2 border-t pt-4">
+                    <button type="button" onclick="closePersonnelModal()" class="px-4 py-2 border rounded-lg text-slate-600 text-sm hover:bg-slate-50 font-medium">Cancel</button>
+                    <button type="submit" class="px-5 py-2 bg-denr-700 hover:bg-denr-800 text-white rounded-lg text-sm font-medium">Save Personnel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: ASSET -->
+    <div id="assetModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden no-print">
+        <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            <div class="bg-denr-800 text-white p-4 flex items-center justify-between">
+                <h3 id="assetModalTitle" class="font-bold text-base flex items-center gap-2">
+                    <i class="fa-solid fa-laptop-medical text-denr-300"></i> Register ICT Equipment
+                </h3>
+                <button onclick="closeAssetModal()" class="text-denr-200 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="assetForm" onsubmit="handleAssetSubmit(event)" class="p-6 overflow-y-auto space-y-4">
+                <input type="hidden" id="aFormOriginalTag">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Asset Tag Number *</label>
+                        <input type="text" id="aFormTag" required placeholder="ICT-2026-0001" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-mono focus:ring-2 focus:ring-denr-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Category *</label>
+                        <select id="aFormCategory" required class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-denr-500 focus:outline-none">
+                            <option value="Desktop">Desktop Computer</option>
+                            <option value="Laptop">Laptop / Notebook</option>
+                            <option value="CCTV">CCTV Camera / NVR</option>
+                            <option value="Printer">Printer / Multifunction</option>
+                            <option value="Scanner">Document Scanner</option>
+                            <option value="UPS">UPS Battery Backup</option>
+                            <option value="Switch">Network Switch</option>
+                            <option value="Router">Network Router</option>
+                            <option value="Firewall">Firewall Hardware</option>
+                            <option value="Modem">Modem / Transceiver</option>
+                            <option value="NAS">Network Attached Storage (NAS)</option>
+                            <option value="Projector">Digital Projector</option>
+                            <option value="External Storage">External Storage / Drive</option>
+                            <option value="Other">Other ICT Equipment</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Brand & Model Name *</label>
+                        <input type="text" id="aFormModel" required placeholder="Dell OptiPlex 7090" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-denr-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Serial Number *</label>
+                        <input type="text" id="aFormSerial" required placeholder="SN-XYZ-98765" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-mono focus:ring-2 focus:ring-denr-500 focus:outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Specifications</label>
+                    <textarea id="aFormSpecs" rows="2" placeholder="Intel i7, 16GB RAM, 512GB SSD..." class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-denr-500 focus:outline-none"></textarea>
+                </div>
+                <div class="border-t pt-3">
+                    <p class="text-xs font-bold uppercase text-denr-800 mb-2">Custody & Personnel Assignment</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Assign to Personnel *</label>
+                            <select id="aFormPersonnel" onchange="autoSyncSectionFromPersonnel()" required class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-denr-500 focus:outline-none"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">DENR Section</label>
+                            <input type="text" id="aFormSection" readonly class="w-full border border-slate-200 bg-slate-100 text-slate-600 rounded-lg p-2.5 text-sm">
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t pt-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Date Issued</label>
+                        <input type="date" id="aFormDate" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-denr-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Condition Status *</label>
+                        <select id="aFormStatus" required class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-denr-500 focus:outline-none">
+                            <option value="In Use">In Use / Issued</option>
+                            <option value="Available">Available / In Stock</option>
+                            <option value="Under Repair">Under Repair / Maintenance</option>
+                            <option value="Unserviceable">Unserviceable / For Disposal</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 border-t pt-4">
+                    <button type="button" onclick="closeAssetModal()" class="px-4 py-2 border rounded-lg text-slate-600 text-sm hover:bg-slate-50 font-medium">Cancel</button>
+                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium">Save Asset Record</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 3: SECTION -->
+    <div id="sectionModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden no-print">
+        <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden">
+            <div class="bg-denr-800 text-white p-4 flex items-center justify-between">
+                <h3 class="font-bold text-base flex items-center gap-2">
+                    <i class="fa-solid fa-building-circle-plus text-denr-300"></i> Add New DENR Section / Office
+                </h3>
+                <button onclick="closeAddSectionModal()" class="text-denr-200 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form onsubmit="handleSectionSubmit(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Section / Division / Office Name *</label>
+                    <input type="text" id="sFormName" required placeholder="e.g. Planning & Technical Services Division" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-denr-500 focus:outline-none">
+                </div>
+                <div class="flex justify-end gap-2 border-t pt-4">
+                    <button type="button" onclick="closeAddSectionModal()" class="px-4 py-2 border rounded-lg text-slate-600 text-sm hover:bg-slate-50 font-medium">Cancel</button>
+                    <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">Save Section</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- PRINT PAR VIEW -->
+    <div id="parPrintContainer" class="print-only p-8 max-w-4xl mx-auto">
+        <div class="text-center border-b-2 border-black pb-4 mb-6">
+            <p class="text-xs font-serif uppercase tracking-widest">Republic of the Philippines</p>
+            <h1 class="text-lg font-bold font-serif">DEPARTMENT OF ENVIRONMENT AND NATURAL RESOURCES</h1>
+            <p class="text-xs font-serif">Community Environment and Natural Resources Office</p>
+            <h2 class="text-base font-bold underline mt-4 tracking-wider">PROPERTY ACKNOWLEDGMENT RECEIPT (PAR)</h2>
+            <p class="text-xs text-right mt-2">PAR Date: <span id="parPrintDate"></span></p>
+        </div>
+        <div class="grid grid-cols-2 gap-4 text-xs mb-6 border p-4 rounded border-black">
+            <div>
+                <p><strong>Entity / Department:</strong> DENR</p>
+                <p><strong>Received By (Personnel):</strong> <span id="parPrintName" class="font-bold underline"></span></p>
+                <p><strong>Designation:</strong> <span id="parPrintDesignation"></span></p>
+            </div>
+            <div>
+                <p><strong>Office / Section:</strong> <span id="parPrintSection"></span></p>
+                <p><strong>Custody Status:</strong> Active Accountability</p>
+            </div>
+        </div>
+        <p class="text-xs mb-2 italic">This is to acknowledge receipt of the following ICT equipment and properties for official DENR use:</p>
+        <table class="w-full border-collapse border border-black text-xs mb-8">
+            <thead>
+                <tr class="bg-gray-100">
+                    <th class="border border-black p-2 text-left">Qty</th>
+                    <th class="border border-black p-2 text-left">Unit</th>
+                    <th class="border border-black p-2 text-left">Item Description & Specifications</th>
+                    <th class="border border-black p-2 text-left">Property Tag / Asset No.</th>
+                    <th class="border border-black p-2 text-left">Serial No.</th>
+                    <th class="border border-black p-2 text-left">Condition</th>
+                </tr>
+            </thead>
+            <tbody id="parPrintTableBody"></tbody>
+        </table>
+        <div class="grid grid-cols-2 gap-12 text-xs mt-12 pt-6">
+            <div class="text-center">
+                <p class="mb-12">Received by (End-User / Personnel):</p>
+                <p id="parPrintSignee" class="font-bold border-b border-black inline-block px-8 uppercase"></p>
+                <p class="text-[10px] text-gray-600 mt-1">Signature over Printed Name / Date</p>
+            </div>
+            <div class="text-center">
+                <p class="mb-12">Issued / Verified by:</p>
+                <p class="font-bold border-b border-black inline-block px-8 uppercase">ICT PROPERTY OFFICER / MIS</p>
+                <p class="text-[10px] text-gray-600 mt-1">Signature over Printed Name / Date</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC WITH SUPABASE -->
+    <script>
+        // ------------------------------------------
+        // SUPABASE CONFIGURATION (REPLACE WITH YOUR KEYS)
+        // ------------------------------------------
+        const SUPABASE_URL = "https://afsifpoysmkkxcshlxzk.supabase.co"; 
+        const SUPABASE_KEY = "sb_publishable_-Xm1_2slGGxLAdhiJJULpw_-mURZ08w";
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let sectionsList = [];
+        let personnelList = [];
+        let assetList = [];
+        let currentUser = null;
+        let selectedPersonnelId = null;
+
+        // INIT APPLICATION
+        document.addEventListener('DOMContentLoaded', async () => {
+            await fetchFromSupabase();
+
+            const sessionData = localStorage.getItem('denr_active_user');
+            if (sessionData) {
+                currentUser = JSON.parse(sessionData);
+                hideAuthOverlay();
+            } else {
+                showAuthOverlay();
+            }
+
+            renderAllDropdowns();
+            renderPersonnelView();
+            renderMasterAssetsView();
+            renderSectionsView();
+            renderDashboard();
+            populatePersonnelDropdown();
+            document.getElementById('parPrintDate').innerText = new Date().toLocaleDateString('en-PH', { dateStyle: 'long' });
+        });
+
+        // ------------------------------------------
+        // SUPABASE DATA FETCHING & SYNC
+        // ------------------------------------------
+        async function fetchFromSupabase() {
+            try {
+                // Fetch Sections
+                const secRes = await supabaseClient.from('sections').select('*');
+                if (secRes.data) sectionsList = secRes.data.map(s => s.name);
+
+                // Fetch Personnel
+                const persRes = await supabaseClient.from('personnel').select('*');
+                if (persRes.data) {
+                    personnelList = persRes.data.map(p => ({
+                        id: p.id,
+                        name: p.name,
+                        designation: p.designation,
+                        section: p.section,
+                        email: p.email,
+                        phone: p.phone,
+                        password: p.password
+                    }));
+                }
+
+                // Fetch Assets
+                const assetRes = await supabaseClient.from('assets').select('*');
+                if (assetRes.data) {
+                    assetList = assetRes.data.map(a => ({
+                        tag: a.tag,
+                        category: a.category,
+                        model: a.model,
+                        serial: a.serial,
+                        specs: a.specs,
+                        personnelId: a.personnel_id,
+                        section: a.section,
+                        date: a.date_issued,
+                        status: a.status
+                    }));
+                }
+            } catch (err) {
+                console.error("Error connecting to Supabase:", err);
+                alert("Failed to connect to Supabase database. Please check your credentials.");
+            }
+        }
+
+        // ------------------------------------------
+        // SECTIONS MANAGEMENT
+        // ------------------------------------------
+        function renderAllDropdowns() {
+            const dropdowns = document.querySelectorAll('.section-dropdown-target');
+            dropdowns.forEach(select => {
+                const isFilter = select.id === 'filterSectionSelect';
+                const currentVal = select.value;
+                select.innerHTML = isFilter ? '<option value="ALL">🏢 All DENR Sections</option>' : '';
+                sectionsList.forEach(sec => {
+                    select.innerHTML += `<option value="${sec}">${sec}</option>`;
+                });
+                if (currentVal && sectionsList.includes(currentVal)) select.value = currentVal;
+            });
+        }
+
+        function openAddSectionModal() {
+            document.getElementById('sectionModal').classList.remove('hidden');
+        }
+
+        function closeAddSectionModal() {
+            document.getElementById('sectionModal').classList.add('hidden');
+            document.getElementById('sFormName').value = '';
+        }
+
+        async function handleSectionSubmit(e) {
+            e.preventDefault();
+            const sectionName = document.getElementById('sFormName').value.trim();
+            if (!sectionName) return;
+
+            if (sectionsList.some(s => s.toLowerCase() === sectionName.toLowerCase())) {
+                alert("This DENR section already exists.");
+                return;
+            }
+
+            const { error } = await supabaseClient.from('sections').insert([{ name: sectionName }]);
+            if (error) {
+                alert("Error saving section: " + error.message);
+                return;
+            }
+
+            sectionsList.push(sectionName);
+            renderAllDropdowns();
+            renderSectionsView();
+            closeAddSectionModal();
+        }
+
+        async function deleteSection(sectionName) {
+            if (confirm(`Are you sure you want to delete section "${sectionName}"?`)) {
+                await supabaseClient.from('sections').delete().eq('name', sectionName);
+                sectionsList = sectionsList.filter(s => s !== sectionName);
+                renderAllDropdowns();
+                renderSectionsView();
+            }
+        }
+
+        // ------------------------------------------
+        // AUTHENTICATION SYSTEM
+        // ------------------------------------------
+        function showAuthOverlay() {
+            document.getElementById('authOverlay').classList.remove('hidden');
+        }
+
+        function hideAuthOverlay() {
+            document.getElementById('authOverlay').classList.add('hidden');
+            if (currentUser) {
+                document.getElementById('headerUserName').innerText = currentUser.name;
+                document.getElementById('headerUserDesignation').innerText = `${currentUser.designation} • ${currentUser.section}`;
+                document.getElementById('userHeaderBadge').classList.remove('hidden');
+                document.getElementById('userHeaderBadge').classList.add('flex');
+            }
+        }
+
+        function showAuthView(viewName) {
+            hideAuthAlert();
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('registerForm').classList.add('hidden');
+            document.getElementById('forgotForm').classList.add('hidden');
+
+            if (viewName === 'login') document.getElementById('loginForm').classList.remove('hidden');
+            if (viewName === 'register') {
+                renderAllDropdowns();
+                document.getElementById('registerForm').classList.remove('hidden');
+            }
+            if (viewName === 'forgot') {
+                document.getElementById('forgotForm').classList.remove('hidden');
+                document.getElementById('forgotStep1').classList.remove('hidden');
+                document.getElementById('forgotStep2').classList.add('hidden');
+            }
+        }
+
+        function showAuthAlert(msg, type = 'error') {
+            const alertBox = document.getElementById('authAlert');
+            alertBox.innerText = msg;
+            alertBox.classList.remove('hidden', 'bg-rose-100', 'text-rose-800', 'bg-emerald-100', 'text-emerald-800');
+            alertBox.classList.add(type === 'error' ? 'bg-rose-100' : 'bg-emerald-100', type === 'error' ? 'text-rose-800' : 'text-emerald-800');
+        }
+
+        function hideAuthAlert() {
+            document.getElementById('authAlert').classList.add('hidden');
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const inputId = document.getElementById('loginId').value.trim().toLowerCase();
+            const password = document.getElementById('loginPassword').value;
+
+            const user = personnelList.find(u => 
+                u.email && (u.email.toLowerCase() === inputId || u.phone === inputId) && u.password === password
+            );
+
+            if (user) {
+                currentUser = user;
+                localStorage.setItem('denr_active_user', JSON.stringify(currentUser));
+                hideAuthOverlay();
+            } else {
+                showAuthAlert('Invalid credentials! Please check your Email/Phone number or Password.', 'error');
+            }
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            const name = document.getElementById('regName').value.trim();
+            const email = document.getElementById('regEmail').value.trim().toLowerCase();
+            const phone = document.getElementById('regPhone').value.trim();
+            const designation = document.getElementById('regDesignation').value.trim();
+            const section = document.getElementById('regSection').value;
+            const password = document.getElementById('regPassword').value;
+
+            const newUserId = 'P' + String(Date.now()).slice(-4);
+            const newPersonnel = { id: newUserId, name, designation, section, email, phone, password };
+
+            const { error } = await supabaseClient.from('personnel').insert([newPersonnel]);
+            if (error) {
+                showAuthAlert('Registration error: ' + error.message, 'error');
+                return;
+            }
+
+            personnelList.push(newPersonnel);
+            currentUser = newPersonnel;
+            localStorage.setItem('denr_active_user', JSON.stringify(currentUser));
+            
+            showAuthAlert('Account created successfully! Logged in.', 'success');
+            setTimeout(() => {
+                hideAuthOverlay();
+                renderPersonnelView();
+                populatePersonnelDropdown();
+            }, 800);
+        }
+
+        function sendRecoveryCode() {
+            const target = document.getElementById('forgotInput').value.trim().toLowerCase();
+            if (!target) {
+                showAuthAlert('Please enter your Email or Mobile Phone Number.', 'error');
+                return;
+            }
+            const user = personnelList.find(u => (u.email && u.email.toLowerCase() === target) || u.phone === target);
+            if (!user) {
+                showAuthAlert('No account found matching that Email or Phone number.', 'error');
+                return;
+            }
+            hideAuthAlert();
+            document.getElementById('forgotStep1').classList.add('hidden');
+            document.getElementById('forgotStep2').classList.remove('hidden');
+        }
+
+        async function handleForgotPassword(e) {
+            e.preventDefault();
+            const target = document.getElementById('forgotInput').value.trim().toLowerCase();
+            const code = document.getElementById('forgotCode').value.trim();
+            const newPassword = document.getElementById('forgotNewPassword').value;
+
+            if (code !== '123456') {
+                showAuthAlert('Invalid verification code! (Use demo code: 123456)', 'error');
+                return;
+            }
+
+            const user = personnelList.find(u => (u.email && u.email.toLowerCase() === target) || u.phone === target);
+            if (user) {
+                await supabaseClient.from('personnel').update({ password: newPassword }).eq('id', user.id);
+                user.password = newPassword;
+                showAuthAlert('Password updated successfully! Please sign in.', 'success');
+                setTimeout(() => showAuthView('login'), 1200);
+            }
+        }
+
+        function handleLogout() {
+            localStorage.removeItem('denr_active_user');
+            currentUser = null;
+            document.getElementById('userHeaderBadge').classList.add('hidden');
+            document.getElementById('userHeaderBadge').classList.remove('flex');
+            showAuthView('login');
+            showAuthOverlay();
+        }
+
+        // ------------------------------------------
+        // TAB SWITCHING & FILTERS
+        // ------------------------------------------
+        function switchTab(tabName) {
+            document.querySelectorAll('.view-panel').forEach(panel => panel.classList.add('hidden'));
+            ['personnel', 'assets', 'sections', 'dashboard'].forEach(t => {
+                const btn = document.getElementById(`tab-${t}`);
+                btn.className = (t === tabName) ? 
+                    'px-4 py-2 rounded-t-lg bg-denr-50 text-denr-900 font-bold transition flex items-center gap-2' : 
+                    'px-4 py-2 rounded-t-lg text-denr-200 hover:text-white hover:bg-denr-700 transition flex items-center gap-2';
+            });
+            document.getElementById(`view-${tabName}`).classList.remove('hidden');
+            if (tabName === 'personnel') renderPersonnelView();
+            if (tabName === 'assets') renderMasterAssetsView();
+            if (tabName === 'sections') renderSectionsView();
+            if (tabName === 'dashboard') renderDashboard();
+        }
+
+        function applyFilters() {
+            const currentTab = document.querySelector('.view-panel:not(.hidden)').id;
+            if (currentTab === 'view-personnel') renderPersonnelView();
+            if (currentTab === 'view-assets') renderMasterAssetsView();
+            if (currentTab === 'view-sections') renderSectionsView();
+        }
+
+        // ------------------------------------------
+        // RENDERING VIEWS
+        // ------------------------------------------
+        function renderPersonnelView() {
+            const grid = document.getElementById('personnelCardsGrid');
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const section = document.getElementById('filterSectionSelect').value;
+            grid.innerHTML = '';
+
+            const filtered = personnelList.filter(p => {
+                const matchSec = (section === 'ALL' || p.section === section);
+                const matchSearch = p.name.toLowerCase().includes(search) || p.designation.toLowerCase().includes(search);
+                return matchSec && matchSearch;
+            });
+
+            document.getElementById('personnelCountBadge').innerText = `${filtered.length} Personnel`;
+
+            filtered.forEach(p => {
+                const assignedItems = assetList.filter(a => a.personnelId === p.id);
+                const card = document.createElement('div');
+                card.className = "bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:border-denr-500 hover:shadow-md transition flex flex-col justify-between";
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-start justify-between gap-2 mb-3">
+                            <div class="w-12 h-12 rounded-full bg-denr-100 text-denr-800 flex items-center justify-center font-bold text-lg border border-denr-200">
+                                <i class="fa-solid fa-user"></i>
+                            </div>
+                            <span class="bg-denr-100 text-denr-800 font-bold text-xs px-2.5 py-1 rounded-full">${assignedItems.length} Assets</span>
+                        </div>
+                        <h3 onclick="openPersonnelDetail('${p.id}')" class="text-base font-bold text-slate-800 hover:text-denr-700 cursor-pointer underline decoration-denr-300 underline-offset-2">${p.name}</h3>
+                        <p class="text-xs text-slate-600 font-medium">${p.designation}</p>
+                        <span class="inline-block mt-2 text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200 font-medium">${p.section}</span>
+                    </div>
+                    <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                        <button onclick="openPersonnelDetail('${p.id}')" class="text-denr-700 font-semibold hover:text-denr-900 flex items-center gap-1">
+                            <i class="fa-solid fa-folder-open"></i> View Asset List & PAR
+                        </button>
+                        <div class="flex gap-2">
+                            <button onclick="editPersonnel('${p.id}')" class="text-slate-400 hover:text-blue-600"><i class="fa-solid fa-pen"></i></button>
+                            <button onclick="deletePersonnel('${p.id}')" class="text-slate-400 hover:text-rose-600"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function openPersonnelDetail(personnelId) {
+            selectedPersonnelId = personnelId;
+            const p = personnelList.find(item => item.id === personnelId);
+            if (!p) return;
+
+            document.getElementById('pDetailName').innerText = p.name;
+            document.getElementById('pDetailDesignation').innerText = p.designation;
+            document.getElementById('pDetailSection').innerText = p.section;
+
+            const assignedAssets = assetList.filter(a => a.personnelId === personnelId);
+            document.getElementById('pDetailTotalItems').innerText = assignedAssets.length;
+            document.getElementById('pDetailPCItems').innerText = assignedAssets.filter(a => ['Desktop', 'Laptop'].includes(a.category)).length;
+            document.getElementById('pDetailPrinterItems').innerText = assignedAssets.filter(a => ['Printer', 'Scanner'].includes(a.category)).length;
+            document.getElementById('pDetailOtherItems').innerText = assignedAssets.filter(a => !['Desktop', 'Laptop', 'Printer', 'Scanner'].includes(a.category)).length;
+
+            const tbody = document.getElementById('personnelItemsTableBody');
+            tbody.innerHTML = '';
+
+            if (assignedAssets.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-400">No ICT assets assigned to this personnel yet.</td></tr>`;
+            } else {
+                assignedAssets.forEach(a => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-50 border-b border-slate-200";
+                    tr.innerHTML = `
+                        <td class="p-3 font-mono font-bold text-denr-800 text-xs">${a.tag}</td>
+                        <td class="p-3"><span class="bg-slate-100 text-slate-700 text-xs font-semibold px-2 py-0.5 rounded">${a.category}</span></td>
+                        <td class="p-3 font-semibold text-slate-800">${a.model}</td>
+                        <td class="p-3 font-mono text-xs">${a.serial}</td>
+                        <td class="p-3 text-xs text-slate-500 max-w-xs truncate">${a.specs || 'N/A'}</td>
+                        <td class="p-3 text-xs text-slate-600">${a.date || 'N/A'}</td>
+                        <td class="p-3"><span class="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-0.5 rounded-full">${a.status}</span></td>
+                        <td class="p-3 text-center">
+                            <button onclick="editAsset('${a.tag}')" class="text-blue-600 hover:text-blue-800 p-1"><i class="fa-solid fa-pen"></i></button>
+                            <button onclick="deleteAsset('${a.tag}')" class="text-rose-600 hover:text-rose-800 p-1 ml-1"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            document.querySelectorAll('.view-panel').forEach(panel => panel.classList.add('hidden'));
+            document.getElementById('view-personnel-detail').classList.remove('hidden');
+        }
+
+        function renderMasterAssetsView() {
+            const tbody = document.getElementById('masterAssetTableBody');
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const section = document.getElementById('filterSectionSelect').value;
+            tbody.innerHTML = '';
+
+            const filtered = assetList.filter(a => {
+                const p = personnelList.find(person => person.id === a.personnelId) || { name: 'Unknown' };
+                const matchSec = (section === 'ALL' || a.section === section);
+                const matchSearch = a.tag.toLowerCase().includes(search) || a.model.toLowerCase().includes(search) || a.serial.toLowerCase().includes(search) || p.name.toLowerCase().includes(search);
+                return matchSec && matchSearch;
+            });
+
+            document.getElementById('masterAssetsCountBadge').innerText = `${filtered.length} Assets`;
+
+            filtered.forEach(a => {
+                const p = personnelList.find(person => person.id === a.personnelId) || { name: 'Unassigned' };
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 border-b border-slate-200";
+                tr.innerHTML = `
+                    <td class="p-3 font-mono font-bold text-denr-800 text-xs">${a.tag}</td>
+                    <td class="p-3"><span class="bg-slate-100 text-slate-800 text-xs font-medium px-2 py-0.5 rounded">${a.category}</span></td>
+                    <td class="p-3 font-semibold text-slate-800">${a.model}</td>
+                    <td class="p-3 font-mono text-xs">${a.serial}</td>
+                    <td class="p-3 text-xs text-slate-600">${a.section}</td>
+                    <td class="p-3 text-xs font-medium text-denr-900">${p.name}</td>
+                    <td class="p-3"><span class="bg-emerald-100 text-emerald-800 text-xs font-bold px-2.5 py-0.5 rounded-full">${a.status}</span></td>
+                    <td class="p-3 text-center">
+                        <button onclick="editAsset('${a.tag}')" class="text-blue-600 hover:text-blue-800 p-1"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="deleteAsset('${a.tag}')" class="text-rose-600 hover:text-rose-800 p-1 ml-1"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderSectionsView() {
+            const container = document.getElementById('sectionsContainer');
+            container.innerHTML = '';
+            sectionsList.forEach(sec => {
+                const sectionPersonnel = personnelList.filter(p => p.section === sec);
+                const sectionAssets = assetList.filter(a => a.section === sec);
+                const card = document.createElement('div');
+                card.className = "bg-white rounded-xl shadow-sm border border-slate-200 p-5";
+                card.innerHTML = `
+                    <div class="flex items-center justify-between border-b pb-3 mb-4">
+                        <h3 class="font-bold text-lg text-denr-900 flex items-center gap-2">
+                            <i class="fa-solid fa-building text-denr-600"></i> ${sec}
+                        </h3>
+                        <div class="flex items-center gap-2">
+                            <span class="bg-denr-100 text-denr-800 text-xs font-bold px-2.5 py-1 rounded-full">${sectionPersonnel.length} Personnel</span>
+                            <span class="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-1 rounded-full">${sectionAssets.length} Assets</span>
+                            <button onclick="deleteSection('${sec.replace(/'/g, "\\'")}')" class="text-slate-400 hover:text-rose-600 ml-2 p-1 text-xs" title="Delete Section"><i class="fa-solid fa-trash-can"></i></button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-slate-50 p-3 rounded-lg border">
+                            <p class="text-xs font-bold text-slate-500 uppercase mb-2">Assigned Personnel</p>
+                            <ul class="text-xs space-y-1">
+                                ${sectionPersonnel.map(p => `<li>• <span class="hover:underline cursor-pointer text-denr-800 font-bold" onclick="openPersonnelDetail('${p.id}')">${p.name}</span> (${p.designation})</li>`).join('') || '<li class="text-slate-400">No personnel registered</li>'}
+                            </ul>
+                        </div>
+                        <div class="bg-slate-50 p-3 rounded-lg border">
+                            <p class="text-xs font-bold text-slate-500 uppercase mb-2">Equipment Summary</p>
+                            <div class="text-xs space-y-1 text-slate-700">
+                                ${sectionAssets.slice(0, 4).map(a => `<div>• <strong>${a.tag}</strong> - ${a.model} (${a.category})</div>`).join('') || '<div class="text-slate-400">No equipment recorded</div>'}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function renderDashboard() {
+            document.getElementById('dashTotalAssets').innerText = assetList.length;
+            document.getElementById('dashTotalPersonnel').innerText = personnelList.length;
+            document.getElementById('dashIssuedAssets').innerText = assetList.filter(a => a.status === 'In Use').length;
+            document.getElementById('dashMaintenanceAssets').innerText = assetList.filter(a => ['Under Repair', 'Unserviceable'].includes(a.status)).length;
+
+            const categories = ['Desktop', 'Laptop', 'CCTV', 'Printer', 'Scanner', 'UPS', 'Switch', 'Router', 'Firewall', 'NAS', 'Projector', 'External Storage'];
+            const container = document.getElementById('categoryStatsList');
+            container.innerHTML = '';
+            categories.forEach(cat => {
+                const count = assetList.filter(a => a.category === cat).length;
+                const div = document.createElement('div');
+                div.className = "bg-slate-50 p-3 rounded-lg border text-center";
+                div.innerHTML = `<p class="text-xs text-slate-500 font-semibold">${cat}</p><p class="text-xl font-bold text-denr-800">${count}</p>`;
+                container.appendChild(div);
+            });
+        }
+
+        // ------------------------------------------
+        // CRUD ACTIONS WITH SUPABASE SYNC
+        // ------------------------------------------
+        function populatePersonnelDropdown() {
+            const select = document.getElementById('aFormPersonnel');
+            select.innerHTML = '<option value="">-- Select Personnel --</option>';
+            personnelList.forEach(p => {
+                select.innerHTML += `<option value="${p.id}">${p.name} (${p.section})</option>`;
+            });
+        }
+
+        function autoSyncSectionFromPersonnel() {
+            const pid = document.getElementById('aFormPersonnel').value;
+            const p = personnelList.find(item => item.id === pid);
+            if (p) document.getElementById('aFormSection').value = p.section;
+        }
+
+        function openPersonnelModal(isEdit = false) {
+            renderAllDropdowns();
+            document.getElementById('personnelModalTitle').innerText = isEdit ? 'Edit Personnel Details' : 'Add DENR Personnel';
+            document.getElementById('personnelModal').classList.remove('hidden');
+        }
+
+        function closePersonnelModal() {
+            document.getElementById('personnelModal').classList.add('hidden');
+            document.getElementById('personnelForm').reset();
+            document.getElementById('pFormId').value = '';
+        }
+
+        async function handlePersonnelSubmit(e) {
+            e.preventDefault();
+            const id = document.getElementById('pFormId').value || 'P' + String(Date.now()).slice(-4);
+            const name = document.getElementById('pFormName').value.trim();
+            const designation = document.getElementById('pFormDesignation').value.trim();
+            const section = document.getElementById('pFormSection').value;
+
+            const existing = personnelList.find(p => p.id === id);
+            const personnelData = { id, name, designation, section, email: existing?.email || null, phone: existing?.phone || null, password: existing?.password || null };
+
+            const { error } = await supabaseClient.from('personnel').upsert([personnelData]);
+            if (error) {
+                alert("Error saving personnel: " + error.message);
+                return;
+            }
+
+            const index = personnelList.findIndex(p => p.id === id);
+            if (index !== -1) personnelList[index] = personnelData;
+            else personnelList.push(personnelData);
+
+            closePersonnelModal();
+            renderPersonnelView();
+            populatePersonnelDropdown();
+            renderDashboard();
+            if (selectedPersonnelId === id) openPersonnelDetail(id);
+        }
+
+        function editPersonnel(id) {
+            const p = personnelList.find(item => item.id === id);
+            if (!p) return;
+            openPersonnelModal(true);
+            document.getElementById('pFormId').value = p.id;
+            document.getElementById('pFormName').value = p.name;
+            document.getElementById('pFormDesignation').value = p.designation;
+            document.getElementById('pFormSection').value = p.section;
+        }
+
+        function editPersonnelFromDetail() {
+            if (selectedPersonnelId) editPersonnel(selectedPersonnelId);
+        }
+
+        async function deletePersonnel(id) {
+            if (confirm("Delete this personnel?")) {
+                await supabaseClient.from('personnel').delete().eq('id', id);
+                personnelList = personnelList.filter(p => p.id !== id);
+                renderPersonnelView();
+                renderDashboard();
+            }
+        }
+
+        function openAssetModal(isEdit = false) {
+            renderAllDropdowns();
+            document.getElementById('assetModalTitle').innerText = isEdit ? 'Edit ICT Asset Record' : 'Register ICT Equipment';
+            document.getElementById('assetModal').classList.remove('hidden');
+            if (!isEdit) {
+                document.getElementById('aFormTag').value = `ICT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+            }
+        }
+
+        function openAssignAssetModalForCurrentPersonnel() {
+            if (!selectedPersonnelId) return;
+            openAssetModal(false);
+            document.getElementById('aFormPersonnel').value = selectedPersonnelId;
+            autoSyncSectionFromPersonnel();
+        }
+
+        function closeAssetModal() {
+            document.getElementById('assetModal').classList.add('hidden');
+            document.getElementById('assetForm').reset();
+            document.getElementById('aFormOriginalTag').value = '';
+        }
+
+        async function handleAssetSubmit(e) {
+            e.preventDefault();
+            const originalTag = document.getElementById('aFormOriginalTag').value;
+            const tag = document.getElementById('aFormTag').value.trim();
+            const category = document.getElementById('aFormCategory').value;
+            const model = document.getElementById('aFormModel').value.trim();
+            const serial = document.getElementById('aFormSerial').value.trim();
+            const specs = document.getElementById('aFormSpecs').value.trim();
+            const personnelId = document.getElementById('aFormPersonnel').value;
+            const section = document.getElementById('aFormSection').value;
+            const date = document.getElementById('aFormDate').value || null;
+            const status = document.getElementById('aFormStatus').value;
+
+            const dbPayload = { tag, category, model, serial, specs, personnel_id: personnelId, section, date_issued: date, status };
+
+            if (originalTag && originalTag !== tag) {
+                await supabaseClient.from('assets').delete().eq('tag', originalTag);
+            }
+
+            const { error } = await supabaseClient.from('assets').upsert([dbPayload]);
+            if (error) {
+                alert("Error saving asset: " + error.message);
+                return;
+            }
+
+            const assetData = { tag, category, model, serial, specs, personnelId, section, date, status };
+            const index = assetList.findIndex(a => a.tag === (originalTag || tag));
+            if (index !== -1) assetList[index] = assetData;
+            else assetList.unshift(assetData);
+
+            closeAssetModal();
+            renderMasterAssetsView();
+            renderDashboard();
+            if (selectedPersonnelId) openPersonnelDetail(selectedPersonnelId);
+        }
+
+        function editAsset(tag) {
+            const a = assetList.find(item => item.tag === tag);
+            if (!a) return;
+            openAssetModal(true);
+            document.getElementById('aFormOriginalTag').value = a.tag;
+            document.getElementById('aFormTag').value = a.tag;
+            document.getElementById('aFormCategory').value = a.category;
+            document.getElementById('aFormModel').value = a.model;
+            document.getElementById('aFormSerial').value = a.serial;
+            document.getElementById('aFormSpecs').value = a.specs || '';
+            document.getElementById('aFormPersonnel').value = a.personnelId;
+            document.getElementById('aFormSection').value = a.section;
+            document.getElementById('aFormDate').value = a.date || '';
+            document.getElementById('aFormStatus').value = a.status;
+        }
+
+        async function deleteAsset(tag) {
+            if (confirm(`Delete ICT Asset ${tag}?`)) {
+                await supabaseClient.from('assets').delete().eq('tag', tag);
+                assetList = assetList.filter(a => a.tag !== tag);
+                renderMasterAssetsView();
+                renderDashboard();
+                if (selectedPersonnelId) openPersonnelDetail(selectedPersonnelId);
+            }
+        }
+
+        // PRINT & EXPORT
+        function printPARForCurrentPersonnel() {
+            if (!selectedPersonnelId) return;
+            const p = personnelList.find(item => item.id === selectedPersonnelId);
+            if (!p) return;
+            const assignedAssets = assetList.filter(a => a.personnelId === p.id);
+            if (assignedAssets.length === 0) {
+                alert("This personnel has no assigned equipment to print.");
+                return;
+            }
+            document.getElementById('parPrintName').innerText = p.name;
+            document.getElementById('parPrintDesignation').innerText = p.designation;
+            document.getElementById('parPrintSection').innerText = p.section;
+            document.getElementById('parPrintSignee').innerText = p.name;
+
+            const tbody = document.getElementById('parPrintTableBody');
+            tbody.innerHTML = '';
+            assignedAssets.forEach(a => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="border border-black p-2">1</td>
+                        <td class="border border-black p-2">Unit</td>
+                        <td class="border border-black p-2"><strong>${a.model}</strong> (${a.category})<br><span class="text-[10px]">${a.specs || ''}</span></td>
+                        <td class="border border-black p-2 font-mono">${a.tag}</td>
+                        <td class="border border-black p-2 font-mono">${a.serial}</td>
+                        <td class="border border-black p-2">${a.status}</td>
+                    </tr>
+                `;
+            });
+            window.print();
+        }
+
+        function printMasterList() {
+            switchTab('assets');
+            setTimeout(() => window.print(), 300);
+        }
+
+        function exportToCSV() {
+            if (assetList.length === 0) {
+                alert("No asset data available to export.");
+                return;
+            }
+            let csv = "Asset Tag,Category,Model,Serial Number,Specifications,Assigned Personnel,Section,Date Issued,Status\n";
+            assetList.forEach(a => {
+                const p = personnelList.find(person => person.id === a.personnelId) || { name: 'Unassigned' };
+                csv += `"${a.tag}","${a.category}","${a.model}","${a.serial}","${(a.specs || '').replace(/"/g, '""')}","${p.name}","${a.section}","${a.date || ''}","${a.status}"\n`;
+            });
+            const link = document.createElement("a");
+            link.href = "data:text/csv;charset=utf-8," + encodeURI(csv);
+            link.download = `DENR_ICT_Inventory_${new Date().toISOString().slice(0,10)}.csv`;
+            link.click();
+        }
+    </script>
+</body>
+</html>
